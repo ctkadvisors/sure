@@ -1,0 +1,89 @@
+name: Publish Sure app on homelab
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Full immutable commit SHA in this fork to build
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sure-app-publish-${{ inputs.source_sha }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: git.knuteson.io/homelab/sure
+  SOURCE_SHA: ${{ inputs.source_sha }}
+  DOCKER_BUILD_RECORD_UPLOAD: "false"
+  DOCKER_BUILD_SUMMARY: "false"
+
+jobs:
+  publish:
+    runs-on: homelab
+    timeout-minutes: 60
+    outputs:
+      image: ${{ steps.published.outputs.image }}
+      digest: ${{ steps.build.outputs.digest }}
+      source_sha: ${{ inputs.source_sha }}
+    steps:
+      - name: Require immutable source and native amd64 runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+
+      - name: Checkout exact source
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+
+      - name: Verify checked-out source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git rev-parse HEAD
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
+
+      - name: Authenticate to own registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121
+        with:
+          registry: git.knuteson.io
+          username: ${{ secrets.GITEA_USERNAME }}
+          password: ${{ secrets.GITEA_TOKEN }}
+
+      - name: Build and publish exact app source
+        id: build
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          build-args: BUILD_COMMIT_SHA=${{ inputs.source_sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/ctkadvisors/sure
+            org.opencontainers.image.revision=${{ inputs.source_sha }}
+          tags: git.knuteson.io/homelab/sure:${{ inputs.source_sha }}
+          provenance: false
+          sbom: false
+          push: true
+
+      - name: Record immutable deployable digest
+        id: published
+        shell: bash
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          printf 'image=%s@%s\n' "$IMAGE_NAME" "$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+          printf '%s@%s\n' "$IMAGE_NAME" "$IMAGE_DIGEST"
