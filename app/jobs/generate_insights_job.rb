@@ -50,7 +50,11 @@ class GenerateInsightsJob < ApplicationJob
       # current state, so a subscribed /insights page (waiting on its manual
       # refresh) always gets its list and button restored.
       I18n.with_locale(family.locale) { broadcast_feed(family) }
-      Array(notifiable_insights).each { |insight| DeliverInsightNotificationJob.enqueue_for(insight) }
+      Array(notifiable_insights).each do |insight|
+        DeliverInsightNotificationJob.enqueue_for(insight)
+        DeliverWebPushNotificationJob.enqueue_for(insight)
+      end
+      DeliverWebPushNotificationJob.retry_enqueue_failures_for(family)
     end
 
     def broadcast_feed(family)
@@ -125,6 +129,7 @@ class GenerateInsightsJob < ApplicationJob
             body: writer.write(generated),
             metadata: metadata,
             facts: facts,
+            notification_version: existing.notification_version + 1,
             period_start: generated.period_start,
             period_end: generated.period_end,
             generated_at: Time.current,
@@ -137,7 +142,7 @@ class GenerateInsightsJob < ApplicationJob
           # numbers. Expiry was the system's doing, not the user's, so the
           # insight resurfaces; the body is still accurate, so no rewrite.
           existing.update!(title: generated.title, status: "active", facts: facts,
-                           generated_at: Time.current, read_at: nil)
+                           notification_version: existing.notification_version + 1, generated_at: Time.current, read_at: nil)
           existing
         else
           # Same signal, same numbers: don't rewrite the body and don't undo
