@@ -89,6 +89,7 @@ jobs:
           git rev-parse HEAD
           ruby --version
       - name: Install disposable container dependencies
+        id: ruby_dependencies
         run: |
           apt-get update -qq
           apt-get install --no-install-recommends -y libvips42 libpq-dev postgresql-client libyaml-dev poppler-utils
@@ -109,14 +110,12 @@ jobs:
       - name: JavaScript service worker tests
         if: ${{ inputs.run_mode != 'lockfile' && hashFiles('test/javascript/*web_push*.mjs') != '' }}
         run: node --test test/javascript/*web_push*.mjs
-      - name: Install JavaScript dependencies
-        if: ${{ inputs.run_mode != 'lockfile' }}
-        run: npm ci
       - name: Prepare disposable test database
-        if: ${{ inputs.run_mode != 'lockfile' }}
+        id: database
+        if: ${{ !cancelled() && inputs.run_mode != 'lockfile' && steps.ruby_dependencies.outcome == 'success' }}
         run: bin/rails db:create db:schema:load db:migrate db:seed
       - name: Record generated database schema when changed
-        if: ${{ inputs.run_mode != 'lockfile' }}
+        if: ${{ !cancelled() && inputs.run_mode != 'lockfile' && steps.database.outcome == 'success' }}
         run: |
           if ! git diff --quiet -- db/schema.rb; then
             echo 'SURE_SCHEMA_BASE64_BEGIN'
@@ -124,10 +123,11 @@ jobs:
             echo 'SURE_SCHEMA_BASE64_END'
           fi
       - name: Build styles for focused tests
-        if: ${{ inputs.run_mode == 'focused' }}
+        id: styles
+        if: ${{ !cancelled() && inputs.run_mode == 'focused' && steps.database.outcome == 'success' }}
         run: bin/rails tailwindcss:build
       - name: Focused Rails behavioral tests
-        if: ${{ inputs.run_mode == 'focused' }}
+        if: ${{ !cancelled() && inputs.run_mode == 'focused' && steps.database.outcome == 'success' && steps.styles.outcome == 'success' }}
         shell: bash
         env:
           TEST_PATHS: ${{ inputs.test_paths }}
@@ -136,7 +136,7 @@ jobs:
           test "${#paths[@]}" -gt 0
           bin/rails test "${paths[@]}"
       - name: Full Rails behavioral suite
-        if: ${{ inputs.run_mode == 'full' }}
+        if: ${{ !cancelled() && inputs.run_mode == 'full' && steps.database.outcome == 'success' }}
         env:
           DISABLE_PARALLELIZATION: "false"
           PARALLEL_WORKERS: "2"
@@ -164,6 +164,11 @@ jobs:
         run: |
           shopt -s globstar
           bundle exec erb_lint ./app/**/*.erb
+      - name: Install JavaScript dependencies
+        if: ${{ !cancelled() && inputs.run_mode != 'lockfile' }}
+        run: |
+          getent ahostsv4 registry.npmjs.org || true
+          npm ci
       - name: Biome lint
         if: ${{ !cancelled() && inputs.run_mode != 'lockfile' }}
         run: npm run lint
