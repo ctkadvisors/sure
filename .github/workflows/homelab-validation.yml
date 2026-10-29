@@ -27,7 +27,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sure-homelab-validation-${{ inputs.run_mode }}
+  group: sure-homelab-validation-${{ inputs.run_mode }}-${{ inputs.source_ref }}
   cancel-in-progress: false
 
 jobs:
@@ -99,8 +99,8 @@ jobs:
         with:
           node-version: "24"
       - name: JavaScript service worker tests
-        if: ${{ inputs.run_mode != 'lockfile' && hashFiles('test/javascript/web_push_service_worker_test.mjs') != '' }}
-        run: node --test test/javascript/web_push_service_worker_test.mjs
+        if: ${{ inputs.run_mode != 'lockfile' && hashFiles('test/javascript/*web_push*.mjs') != '' }}
+        run: node --test test/javascript/*web_push*.mjs
       - name: Install JavaScript dependencies
         if: ${{ inputs.run_mode == 'full' }}
         run: npm ci
