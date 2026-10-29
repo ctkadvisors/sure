@@ -165,12 +165,12 @@ jobs:
           shopt -s globstar
           bundle exec erb_lint ./app/**/*.erb
       - name: Install JavaScript dependencies
-        if: ${{ !cancelled() && inputs.run_mode != 'lockfile' }}
+        if: ${{ !cancelled() && inputs.run_mode != 'lockfile' && inputs.runner_label == 'homelab' }}
         run: |
           getent ahostsv4 registry.npmjs.org || true
           npm ci
       - name: Biome lint
-        if: ${{ !cancelled() && inputs.run_mode != 'lockfile' }}
+        if: ${{ !cancelled() && inputs.run_mode != 'lockfile' && inputs.runner_label == 'homelab' }}
         run: npm run lint
       - name: Security analysis
         if: ${{ !cancelled() && inputs.run_mode != 'lockfile' }}
