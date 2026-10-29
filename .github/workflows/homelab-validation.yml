@@ -8,6 +8,20 @@ on:
         required: true
         default: main
         type: string
+      run_mode:
+        description: Validation scope
+        required: true
+        default: full
+        type: choice
+        options:
+          - full
+          - focused
+          - lockfile
+      test_paths:
+        description: Space-separated Minitest paths for focused mode
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -72,18 +86,38 @@ jobs:
           apt-get install --no-install-recommends -y libvips42 libpq-dev postgresql-client libyaml-dev poppler-utils
           gem install bundler -v 2.6.7 --no-document
           bundle _2.6.7_ install
+      - name: Record resolved lockfile when changed
+        run: |
+          if ! git diff --quiet -- Gemfile.lock; then
+            echo 'SURE_LOCKFILE_BASE64_BEGIN'
+            ruby -rbase64 -e 'puts Base64.strict_encode64(File.binread("Gemfile.lock"))'
+            echo 'SURE_LOCKFILE_BASE64_END'
+          fi
       - name: Set up Node in disposable container
+        if: ${{ inputs.run_mode == 'full' }}
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: "24"
       - name: Install JavaScript dependencies
+        if: ${{ inputs.run_mode == 'full' }}
         run: npm ci
       - name: Prepare disposable test database
+        if: ${{ inputs.run_mode != 'lockfile' }}
         run: bin/rails db:create db:schema:load db:seed
+      - name: Focused Rails behavioral tests
+        if: ${{ inputs.run_mode == 'focused' }}
+        shell: bash
+        env:
+          TEST_PATHS: ${{ inputs.test_paths }}
+        run: |
+          read -r -a paths <<< "$TEST_PATHS"
+          test "${#paths[@]}" -gt 0
+          bin/rails test "${paths[@]}"
       - name: Full Rails behavioral suite
+        if: ${{ inputs.run_mode == 'full' }}
         run: bin/rails test
       - name: Encryption tests
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && inputs.run_mode == 'full' }}
         shell: bash
         env:
           ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY: test
@@ -94,17 +128,17 @@ jobs:
           test "${#files[@]}" -gt 0
           bin/rails test "${files[@]}"
       - name: Full browser system suite
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && inputs.run_mode == 'full' }}
         run: bin/rails test:system
       - name: Ruby lint
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && inputs.run_mode == 'full' }}
         run: bin/rubocop -f github
       - name: ERB lint
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && inputs.run_mode == 'full' }}
         run: bundle exec erb_lint ./app/**/*.erb
       - name: Biome lint
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && inputs.run_mode == 'full' }}
         run: npm run lint
       - name: Security analysis
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && inputs.run_mode == 'full' }}
         run: bin/brakeman --no-pager
