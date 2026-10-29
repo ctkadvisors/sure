@@ -102,7 +102,7 @@ jobs:
         if: ${{ inputs.run_mode != 'lockfile' && hashFiles('test/javascript/*web_push*.mjs') != '' }}
         run: node --test test/javascript/*web_push*.mjs
       - name: Install JavaScript dependencies
-        if: ${{ inputs.run_mode == 'full' }}
+        if: ${{ inputs.run_mode != 'lockfile' }}
         run: npm ci
       - name: Prepare disposable test database
         if: ${{ inputs.run_mode != 'lockfile' }}
@@ -148,14 +148,14 @@ jobs:
         if: ${{ !cancelled() && inputs.run_mode == 'full' }}
         run: bin/rails test:system
       - name: Ruby lint
-        if: ${{ !cancelled() && inputs.run_mode == 'full' }}
+        if: ${{ !cancelled() && inputs.run_mode != 'lockfile' }}
         run: bin/rubocop -f github
       - name: ERB lint
-        if: ${{ !cancelled() && inputs.run_mode == 'full' }}
+        if: ${{ !cancelled() && inputs.run_mode != 'lockfile' }}
         run: bundle exec erb_lint ./app/**/*.erb
       - name: Biome lint
-        if: ${{ !cancelled() && inputs.run_mode == 'full' }}
+        if: ${{ !cancelled() && inputs.run_mode != 'lockfile' }}
         run: npm run lint
       - name: Security analysis
-        if: ${{ !cancelled() && inputs.run_mode == 'full' }}
+        if: ${{ !cancelled() && inputs.run_mode != 'lockfile' }}
         run: bin/brakeman --no-pager
