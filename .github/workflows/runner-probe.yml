@@ -1,0 +1,20 @@
+name: Homelab runner probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: homelab-arm64
+    timeout-minutes: 3
+    steps:
+      - name: Read existing runner and Docker runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -s
+          uname -m
+          for tool in docker ruby postgres; do
+            command -v "$tool" || true
+          done
+          timeout 10 docker info --format '{{.OSType}}/{{.Architecture}} {{.ServerVersion}}'
