@@ -106,7 +106,15 @@ jobs:
         run: npm ci
       - name: Prepare disposable test database
         if: ${{ inputs.run_mode != 'lockfile' }}
-        run: bin/rails db:create db:schema:load db:seed
+        run: bin/rails db:create db:schema:load db:migrate db:seed
+      - name: Record generated database schema when changed
+        if: ${{ inputs.run_mode != 'lockfile' }}
+        run: |
+          if ! git diff --quiet -- db/schema.rb; then
+            echo 'SURE_SCHEMA_BASE64_BEGIN'
+            ruby -rbase64 -e 'puts Base64.strict_encode64(File.binread("db/schema.rb"))'
+            echo 'SURE_SCHEMA_BASE64_END'
+          fi
       - name: Build styles for focused tests
         if: ${{ inputs.run_mode == 'focused' }}
         run: bin/rails tailwindcss:build
@@ -121,6 +129,9 @@ jobs:
           bin/rails test "${paths[@]}"
       - name: Full Rails behavioral suite
         if: ${{ inputs.run_mode == 'full' }}
+        env:
+          DISABLE_PARALLELIZATION: "false"
+          PARALLEL_WORKERS: "2"
         run: bin/rails test
       - name: Encryption tests
         if: ${{ !cancelled() && inputs.run_mode == 'full' }}
