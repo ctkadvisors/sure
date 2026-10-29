@@ -1,0 +1,110 @@
+name: Homelab validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Commit or branch in this fork to validate
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sure-homelab-validation
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: homelab
+    timeout-minutes: 90
+    container:
+      image: ruby:3.4.9-bookworm
+    env:
+      RAILS_ENV: test
+      DB_HOST: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      REDIS_URL: redis://redis:6379/1
+      SELENIUM_REMOTE_URL: http://selenium:4444
+      DISABLE_PARALLELIZATION: "true"
+      PLAID_CLIENT_ID: foo
+      PLAID_SECRET: bar
+      BUNDLE_JOBS: "3"
+      BUNDLE_RETRY: "3"
+    services:
+      postgres:
+        image: postgres:16-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-bookworm
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      selenium:
+        image: selenium/standalone-chromium:latest
+        options: --shm-size=2g
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          ref: ${{ inputs.source_ref }}
+          persist-credentials: false
+      - name: Record source and runtime
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git rev-parse HEAD
+          ruby --version
+      - name: Install disposable container dependencies
+        run: |
+          apt-get update -qq
+          apt-get install --no-install-recommends -y libvips42 libpq-dev postgresql-client libyaml-dev poppler-utils
+          gem install bundler -v 2.6.7 --no-document
+          bundle _2.6.7_ install
+      - name: Set up Node in disposable container
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "24"
+      - name: Install JavaScript dependencies
+        run: npm ci
+      - name: Prepare disposable test database
+        run: bin/rails db:create db:schema:load db:seed
+      - name: Full Rails behavioral suite
+        run: bin/rails test
+      - name: Encryption tests
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY: test
+          ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY: test
+          ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT: test
+        run: |
+          mapfile -t files < <(grep -rl --include='*_test.rb' 'encryption_ready?' test | sort)
+          test "${#files[@]}" -gt 0
+          bin/rails test "${files[@]}"
+      - name: Full browser system suite
+        if: ${{ !cancelled() }}
+        run: bin/rails test:system
+      - name: Ruby lint
+        if: ${{ !cancelled() }}
+        run: bin/rubocop -f github
+      - name: ERB lint
+        if: ${{ !cancelled() }}
+        run: bundle exec erb_lint ./app/**/*.erb
+      - name: Biome lint
+        if: ${{ !cancelled() }}
+        run: npm run lint
+      - name: Security analysis
+        if: ${{ !cancelled() }}
+        run: bin/brakeman --no-pager
