@@ -133,5 +133,4 @@ class Settings::PreferencesControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, device.endpoint
     assert_not_includes response.body, device.auth
   end
-
 end
