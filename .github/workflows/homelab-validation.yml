@@ -94,10 +94,13 @@ jobs:
             echo 'SURE_LOCKFILE_BASE64_END'
           fi
       - name: Set up Node in disposable container
-        if: ${{ inputs.run_mode == 'full' }}
+        if: ${{ inputs.run_mode != 'lockfile' }}
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: "24"
+      - name: JavaScript service worker tests
+        if: ${{ inputs.run_mode != 'lockfile' && hashFiles('test/javascript/web_push_service_worker_test.mjs') != '' }}
+        run: node --test test/javascript/web_push_service_worker_test.mjs
       - name: Install JavaScript dependencies
         if: ${{ inputs.run_mode == 'full' }}
         run: npm ci
