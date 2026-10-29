@@ -27,7 +27,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sure-homelab-validation
+  group: sure-homelab-validation-${{ inputs.run_mode }}
   cancel-in-progress: false
 
 jobs:
