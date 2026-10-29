@@ -4,17 +4,49 @@ on:
 permissions:
   contents: read
 jobs:
-  probe:
+  host_resolution:
     runs-on: homelab-arm64
     timeout-minutes: 3
     steps:
-      - name: Read existing runner and Docker runtime
-        shell: bash
+      - name: Read guest DNS and existing Docker
         run: |
-          set -euo pipefail
           uname -s
           uname -m
-          for tool in docker ruby postgres; do
-            command -v "$tool" || true
-          done
           timeout 10 docker info --format '{{.OSType}}/{{.Architecture}} {{.ServerVersion}}'
+          getent ahosts registry.npmjs.org || true
+          sed -n '/npm\|node\|registry/p' /etc/hosts
+          cat /etc/resolv.conf
+  container_resolution:
+    needs: host_resolution
+    runs-on: homelab-arm64
+    timeout-minutes: 5
+    container:
+      image: ruby:3.4.9-bookworm
+    steps:
+      - name: Set up disposable Node runtime
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "24"
+      - name: Read container DNS and sanitized proxy endpoints
+        run: |
+          getent ahosts registry.npmjs.org || true
+          sed -n '/npm\|node\|registry/p' /etc/hosts
+          cat /etc/resolv.conf
+          ruby -ruri <<'RUBY'
+          def report_endpoint(name, raw)
+            if raw.nil? || raw.strip.empty? || %w[null false undefined].include?(raw.strip)
+              puts "#{name}: unset"
+              return
+            end
+            uri = URI.parse(raw.strip)
+            puts "#{name}: host=#{uri.host.inspect} port=#{uri.port.inspect}"
+          rescue URI::Error
+            puts "#{name}: set, unparseable (value withheld)"
+          end
+          %w[HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy npm_config_proxy npm_config_https_proxy].each do |name|
+            report_endpoint("env.#{name}", ENV[name])
+          end
+          %w[proxy https-proxy registry].each do |name|
+            report_endpoint("npm.#{name}", IO.popen(["npm", "config", "get", name], &:read))
+          end
+          RUBY
