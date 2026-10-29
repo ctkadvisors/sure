@@ -50,7 +50,7 @@ jobs:
       BUNDLE_RETRY: "3"
     services:
       postgres:
-        image: postgres:16-bookworm
+        image: ${{ inputs.run_mode != 'lockfile' && 'postgres:16-bookworm' || '' }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -60,14 +60,14 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       redis:
-        image: redis:7-bookworm
+        image: ${{ inputs.run_mode != 'lockfile' && 'redis:7-bookworm' || '' }}
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
       selenium:
-        image: selenium/standalone-chromium:latest
+        image: ${{ inputs.run_mode == 'full' && 'selenium/standalone-chromium@sha256:c7c17cd79c62819a8329df00e610dbc4073c279da034a6f37135d454eb0d8870' || '' }}
         options: --shm-size=2g
     steps:
       - name: Checkout source
