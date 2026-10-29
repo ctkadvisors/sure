@@ -35,7 +35,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sure-homelab-validation-${{ inputs.run_mode }}-${{ inputs.source_ref }}
+  group: sure-homelab-validation-${{ inputs.run_mode }}-${{ inputs.source_ref }}-${{ inputs.runner_label }}
   cancel-in-progress: false
 
 jobs:
