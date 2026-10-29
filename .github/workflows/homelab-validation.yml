@@ -8,6 +8,14 @@ on:
         required: true
         default: main
         type: string
+      runner_label:
+        description: Existing dedicated homelab CI pool
+        required: true
+        default: homelab
+        type: choice
+        options:
+          - homelab
+          - homelab-arm64
       run_mode:
         description: Validation scope
         required: true
@@ -32,7 +40,7 @@ concurrency:
 
 jobs:
   validate:
-    runs-on: homelab
+    runs-on: ${{ inputs.runner_label }}
     timeout-minutes: 90
     container:
       image: ruby:3.4.9-bookworm
