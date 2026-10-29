@@ -152,7 +152,10 @@ jobs:
         run: bin/rubocop -f github
       - name: ERB lint
         if: ${{ !cancelled() && inputs.run_mode != 'lockfile' }}
-        run: bundle exec erb_lint ./app/**/*.erb
+        shell: bash
+        run: |
+          shopt -s globstar
+          bundle exec erb_lint ./app/**/*.erb
       - name: Biome lint
         if: ${{ !cancelled() && inputs.run_mode != 'lockfile' }}
         run: npm run lint
