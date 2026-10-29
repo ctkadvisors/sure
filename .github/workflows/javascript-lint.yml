@@ -1,0 +1,36 @@
+name: Homelab JavaScript lint
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Exact source commit or branch in this fork to lint
+        required: true
+        default: main
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: sure-biome-${{ inputs.source_ref }}
+  cancel-in-progress: false
+jobs:
+  biome:
+    runs-on: homelab
+    timeout-minutes: 20
+    container:
+      image: node:24-bookworm
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          ref: ${{ inputs.source_ref }}
+          persist-credentials: false
+      - name: Record source and Node runtime
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git rev-parse HEAD
+          node --version
+          npm --version
+      - name: Install locked JavaScript dependencies
+        run: npm ci
+      - name: Biome lint
+        run: npm run lint
