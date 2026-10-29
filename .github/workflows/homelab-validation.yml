@@ -122,27 +122,47 @@ jobs:
             ruby -rbase64 -e 'puts Base64.strict_encode64(File.binread("db/schema.rb"))'
             echo 'SURE_SCHEMA_BASE64_END'
           fi
-      - name: Build styles for focused tests
+      - name: Build styles for behavioral and browser tests
         id: styles
-        if: ${{ !cancelled() && inputs.run_mode == 'focused' && steps.database.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.run_mode != 'lockfile' && steps.database.outcome == 'success' }}
         run: bin/rails tailwindcss:build
-      - name: Focused Rails behavioral tests
-        if: ${{ !cancelled() && inputs.run_mode == 'focused' && steps.database.outcome == 'success' && steps.styles.outcome == 'success' }}
+      - name: Critical Rails behavioral tests
+        id: critical_rails
+        if: ${{ !cancelled() && inputs.run_mode != 'lockfile' && steps.database.outcome == 'success' && steps.styles.outcome == 'success' }}
         shell: bash
         env:
           TEST_PATHS: ${{ inputs.test_paths }}
+          RUN_MODE: ${{ inputs.run_mode }}
         run: |
-          read -r -a paths <<< "$TEST_PATHS"
+          if [ "$RUN_MODE" = full ]; then
+            paths=(
+              test/models/web_push_subscription_test.rb
+              test/models/web_push/client_test.rb
+              test/controllers/web_push_subscriptions_controller_test.rb
+              test/jobs/deliver_web_push_notification_job_test.rb
+              test/controllers/settings/preferences_controller_test.rb
+              test/jobs/generate_insights_job_test.rb
+              test/controllers/pwa_controller_test.rb
+              test/jobs/deliver_insight_notification_job_test.rb
+              test/models/session_test.rb
+            )
+          else
+            read -r -a paths <<< "$TEST_PATHS"
+          fi
           test "${#paths[@]}" -gt 0
           bin/rails test "${paths[@]}"
+      - name: Critical browser system tests
+        id: critical_system
+        if: ${{ !cancelled() && inputs.run_mode == 'full' && steps.critical_rails.outcome == 'success' }}
+        run: bin/rails test test/system/web_push_notifications_test.rb
       - name: Full Rails behavioral suite
-        if: ${{ !cancelled() && inputs.run_mode == 'full' && steps.database.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.run_mode == 'full' && steps.critical_rails.outcome == 'success' && steps.critical_system.outcome == 'success' }}
         env:
           DISABLE_PARALLELIZATION: "false"
           PARALLEL_WORKERS: "2"
         run: bin/rails test
       - name: Encryption tests
-        if: ${{ !cancelled() && inputs.run_mode == 'full' }}
+        if: ${{ !cancelled() && inputs.run_mode == 'full' && steps.critical_rails.outcome == 'success' && steps.critical_system.outcome == 'success' }}
         shell: bash
         env:
           ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY: test
@@ -153,7 +173,7 @@ jobs:
           test "${#files[@]}" -gt 0
           bin/rails test "${files[@]}"
       - name: Full browser system suite
-        if: ${{ !cancelled() && inputs.run_mode == 'full' }}
+        if: ${{ !cancelled() && inputs.run_mode == 'full' && steps.critical_rails.outcome == 'success' && steps.critical_system.outcome == 'success' }}
         run: bin/rails test:system
       - name: Ruby lint
         if: ${{ !cancelled() && inputs.run_mode != 'lockfile' }}
