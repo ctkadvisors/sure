@@ -204,6 +204,78 @@ class DeliverWebPushNotificationJobTest < ActiveJob::TestCase
     assert_equal "failed", delivery.reload.status
   end
 
+  test "recovered jobs share the provider attempt budget with the interrupted retry chain" do
+    delivery = enqueue_delivery
+    @client.expects(:deliver).raises(WebPush::Client::TransientError).times(5)
+    original_job = DeliverWebPushNotificationJob.new(web_push_delivery_id: delivery.id)
+    4.times { original_job.perform_now }
+    clear_enqueued_jobs
+
+    travel 16.minutes do
+      assert_enqueued_jobs 1, only: DeliverWebPushNotificationJob do
+        DeliverWebPushNotificationJob.retry_enqueue_failures_for(@insight.family)
+      end
+      DeliverWebPushNotificationJob.perform_now(web_push_delivery_id: delivery.id)
+    end
+
+    assert_equal "failed", delivery.reload.status
+    assert_no_enqueued_jobs only: DeliverWebPushNotificationJob do
+      DeliverWebPushNotificationJob.perform_now(web_push_delivery_id: delivery.id)
+      DeliverWebPushNotificationJob.retry_enqueue_failures_for(@insight.family)
+    end
+  end
+
+  test "an interrupted provider call consumes its durable attempt before recovery" do
+    delivery = enqueue_delivery
+    sequence = sequence("provider calls")
+    @client.expects(:deliver).raises(RuntimeError, "Worker interrupted").once.in_sequence(sequence)
+    @client.expects(:deliver).raises(WebPush::Client::TransientError).times(4).in_sequence(sequence)
+
+    assert_raises(RuntimeError) do
+      DeliverWebPushNotificationJob.perform_now(web_push_delivery_id: delivery.id)
+    end
+
+    travel 16.minutes do
+      DeliverWebPushNotificationJob.retry_enqueue_failures_for(@insight.family)
+      replacement_job = DeliverWebPushNotificationJob.new(web_push_delivery_id: delivery.id)
+      4.times { replacement_job.perform_now }
+    end
+
+    assert_equal "failed", delivery.reload.status
+  end
+
+  test "an in-flight attempt cannot be duplicated or reclaimed just because its queue claim is old" do
+    delivery = enqueue_delivery
+    delivery.update!(enqueued_at: 1.hour.ago)
+    @client.expects(:deliver).once.with do |**_arguments|
+      assert_no_enqueued_jobs only: DeliverWebPushNotificationJob do
+        DeliverWebPushNotificationJob.retry_enqueue_failures_for(@insight.family)
+        DeliverWebPushNotificationJob.perform_now(web_push_delivery_id: delivery.id)
+      end
+      true
+    end.returns(:accepted)
+
+    DeliverWebPushNotificationJob.perform_now(web_push_delivery_id: delivery.id)
+
+    assert_equal "accepted", delivery.reload.status
+    assert_equal 1, delivery.provider_attempts
+  end
+
+  test "a gone response does not delete credentials refreshed during provider IO" do
+    delivery = enqueue_delivery
+    @client.expects(:deliver).with do |**_arguments|
+      travel 1.second do
+        register_web_push(user: @user, session: @subscription.session, endpoint: @subscription.endpoint)
+      end
+      true
+    end.returns(:gone)
+
+    DeliverWebPushNotificationJob.perform_now(web_push_delivery_id: delivery.id)
+
+    assert WebPushSubscription.exists?(@subscription.id)
+    assert_equal "rejected", delivery.reload.status
+  end
+
   test "an abandoned pending claim is recovered after fifteen minutes" do
     delivery = enqueue_delivery
     clear_enqueued_jobs
