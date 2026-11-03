@@ -39,4 +39,16 @@ class WebPushActivityTest < ActionDispatch::IntegrationTest
     assert Session.exists?(@session.id)
     assert device.reload.eligible?
   end
+
+  test "API authentication does not refresh a browser registration" do
+    device = register_web_push(user: @user, session: @session)
+    device.update_columns(last_seen_at: 2.hours.ago)
+    original_seen_at = device.reload.last_seen_at
+    api_key = @user.api_keys.create!(name: "Web Push API boundary", scopes: [ "read" ], source: "web")
+
+    get "/api/v1/accounts", headers: { "X-Api-Key" => api_key.plain_key, "Accept" => "application/json" }
+
+    assert_response :success
+    assert_equal original_seen_at, device.reload.last_seen_at
+  end
 end

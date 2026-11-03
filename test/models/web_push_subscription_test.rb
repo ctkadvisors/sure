@@ -72,7 +72,7 @@ class WebPushSubscriptionTest < ActiveSupport::TestCase
     end
   end
 
-  test "revoked and expired sessions cannot receive notifications" do
+  test "revoked sessions and inactive browser registrations cannot receive notifications" do
     subscription = WebPushSubscription.register_for!(user: @user, session: @session, **@attributes)
     assert subscription.eligible?
     subscription.update_columns(last_seen_at: 31.days.ago)

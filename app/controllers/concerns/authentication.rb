@@ -19,6 +19,7 @@ module Authentication
       if session_record = find_session_by_cookie
         Current.session = session_record
         end_impersonation_if_target_inactive!
+        WebPushSubscription.refresh_for_session!(Current.session, Current.user)
       else
         if self_hosted_first_login?
           redirect_to new_registration_url

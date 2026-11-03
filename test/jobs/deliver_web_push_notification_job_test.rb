@@ -136,7 +136,7 @@ class DeliverWebPushNotificationJobTest < ActiveJob::TestCase
     DeliverWebPushNotificationJob.perform_now(web_push_delivery_id: delivery.id)
   end
 
-  test "expired revoked or replaced sessions cannot receive a queued notification" do
+  test "inactive browser registrations and replaced sessions cannot receive a queued notification" do
     delivery = enqueue_delivery
     @client.expects(:deliver).never
     @subscription.update_columns(last_seen_at: 31.days.ago)
