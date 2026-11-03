@@ -24,6 +24,7 @@ on:
         options:
           - full
           - focused
+          - rails
           - lockfile
       test_paths:
         description: Space-separated Minitest paths for focused mode
@@ -47,6 +48,7 @@ jobs:
     env:
       RAILS_ENV: test
       DB_HOST: postgres
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       REDIS_URL: redis://redis:6379/1
@@ -134,7 +136,10 @@ jobs:
           TEST_PATHS: ${{ inputs.test_paths }}
           RUN_MODE: ${{ inputs.run_mode }}
         run: |
-          if [ "$RUN_MODE" = full ]; then
+          if [ "$RUN_MODE" = rails ]; then
+            DISABLE_PARALLELIZATION=false PARALLEL_WORKERS=2 bin/rails test
+            exit $?
+          elif [ "$RUN_MODE" = full ]; then
             paths=(
               test/models/web_push_subscription_test.rb
               test/models/web_push/client_test.rb
