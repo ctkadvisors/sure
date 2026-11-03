@@ -6,7 +6,7 @@ en:
     disable: Disable this device
     test: Test this device
     preview: Preview
-    session_notice: Notifications stop when you sign out or your session expires after 30 days of inactivity. Open Sure regularly to keep your session active.
+    session_notice: Notifications stop when you sign out or after 30 days without browser activity. Open Sure regularly to keep notifications active.
     ios_guidance: On iPhone or iPad, open Sure in Safari, choose Share → Add to Home Screen, then enable notifications from the installed app. Requires iOS or iPadOS 16.4 or later.
     budget_title: Budget warnings
     budget_description: Also notify me when existing budget insights report categories near their limit or over budget. Off by default; applies to my enabled browser devices.

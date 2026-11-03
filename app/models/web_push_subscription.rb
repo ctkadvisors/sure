@@ -91,7 +91,13 @@ class WebPushSubscription < ApplicationRecord
   def eligible_for?(insight)
     return false unless eligible? && user.preview_features_enabled?
     return false unless insight.family_id == user.family_id && insight.active?
-    return false unless Insight.about_shared_accounts.exists?(insight.id)
+    if insight.metadata.key?("account_id")
+      # This release predates the shared-insight scope. Require every active
+      # member to retain access before sending its family-wide account insight.
+      account = user.family.accounts.visible.find_by(id: insight.metadata["account_id"])
+      return false unless account
+      return false if user.family.users.where(active: true).any? { |member| !Account.accessible_by(member).exists?(account.id) }
+    end
     return false if insight.insight_type == "budget_on_track"
 
     if insight.insight_type == "budget_at_risk"

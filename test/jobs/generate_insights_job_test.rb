@@ -413,7 +413,7 @@ class GenerateInsightsJobTest < ActiveJob::TestCase
         title: title,
         template_key: "idle_cash",
         facts: { account: "Test Checking", balance: "$#{(display_balance || balance).to_i}", idle_days: 60 },
-        metadata: { account_id: "test-account", balance: balance },
+        metadata: { account_id: accounts(:depository).id, balance: balance },
         currency: "USD",
         period_start: nil,
         period_end: nil,

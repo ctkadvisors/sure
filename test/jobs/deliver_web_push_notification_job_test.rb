@@ -147,6 +147,19 @@ class DeliverWebPushNotificationJobTest < ActiveJob::TestCase
     DeliverWebPushNotificationJob.perform_now(web_push_delivery_id: delivery.id)
   end
 
+  test "an account alert stops when another active member loses access" do
+    @insight.update!(metadata: { account_id: accounts(:depository).id })
+    assert @subscription.eligible_for?(@insight)
+    delivery = enqueue_delivery
+    account_shares(:depository_shared_with_member).destroy!
+    assert_not @subscription.eligible_for?(@insight)
+    @client.expects(:deliver).never
+
+    DeliverWebPushNotificationJob.perform_now(web_push_delivery_id: delivery.id)
+
+    assert_equal "skipped", delivery.reload.status
+  end
+
   test "self hosted mode delivers browser push independently of APNs restrictions" do
     Rails.application.config.stubs(:app_mode).returns("self_hosted".inquiry)
     delivery = enqueue_delivery
