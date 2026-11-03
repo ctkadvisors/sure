@@ -44,7 +44,7 @@ class WebPushActivityTest < ActionDispatch::IntegrationTest
     device = register_web_push(user: @user, session: @session)
     device.update_columns(last_seen_at: 2.hours.ago)
     original_seen_at = device.reload.last_seen_at
-    api_key = @user.api_keys.create!(name: "Web Push API boundary", scopes: [ "read" ], source: "web")
+    api_key = @user.api_keys.create!(name: "Web Push API boundary", scopes: [ "read" ], source: "web", key: ApiKey.generate_secure_key)
 
     get "/api/v1/accounts", headers: { "X-Api-Key" => api_key.plain_key, "Accept" => "application/json" }
 
