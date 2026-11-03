@@ -144,8 +144,9 @@ jobs:
               test/jobs/generate_insights_job_test.rb
               test/controllers/pwa_controller_test.rb
               test/jobs/deliver_insight_notification_job_test.rb
-              test/models/session_test.rb
             )
+            if [ -f test/models/session_test.rb ]; then paths+=(test/models/session_test.rb); fi
+            if [ -f test/controllers/web_push_activity_test.rb ]; then paths+=(test/controllers/web_push_activity_test.rb); fi
           else
             read -r -a paths <<< "$TEST_PATHS"
           fi
