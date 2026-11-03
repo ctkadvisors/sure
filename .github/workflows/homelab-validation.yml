@@ -75,7 +75,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       selenium:
-        image: ${{ inputs.run_mode == 'full' && 'selenium/standalone-chromium@sha256:c7c17cd79c62819a8329df00e610dbc4073c279da034a6f37135d454eb0d8870' || '' }}
+        image: ${{ inputs.run_mode != 'lockfile' && 'selenium/standalone-chromium@sha256:c7c17cd79c62819a8329df00e610dbc4073c279da034a6f37135d454eb0d8870' || '' }}
         options: --shm-size=2g
     steps:
       - name: Checkout source
