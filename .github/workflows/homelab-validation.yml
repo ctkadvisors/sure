@@ -120,9 +120,9 @@ jobs:
         if: ${{ !cancelled() && inputs.run_mode != 'lockfile' && steps.database.outcome == 'success' }}
         run: |
           if ! git diff --quiet -- db/schema.rb; then
-            echo 'SURE_SCHEMA_BASE64_BEGIN'
-            ruby -rbase64 -e 'puts Base64.strict_encode64(File.binread("db/schema.rb"))'
-            echo 'SURE_SCHEMA_BASE64_END'
+            echo 'SURE_SCHEMA_DIFF_BEGIN'
+            git --no-pager diff -- db/schema.rb
+            echo 'SURE_SCHEMA_DIFF_END'
           fi
       - name: Build styles for behavioral and browser tests
         id: styles
