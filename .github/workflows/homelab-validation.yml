@@ -144,11 +144,15 @@ jobs:
               test/models/web_push_subscription_test.rb
               test/models/web_push/client_test.rb
               test/controllers/web_push_subscriptions_controller_test.rb
-              test/jobs/deliver_web_push_notification_job_test.rb
+              test/jobs/deliver_insight_notification_job_web_push_test.rb
               test/controllers/settings/preferences_controller_test.rb
               test/jobs/generate_insights_job_test.rb
               test/controllers/pwa_controller_test.rb
               test/jobs/deliver_insight_notification_job_test.rb
+              test/integration/push_delivery_concurrency_test.rb
+              test/jobs/demo_family_refresh_job_test.rb
+              test/models/provider/enable_banking_test.rb
+              test/models/provider/plaid_test.rb
             )
             if [ -f test/models/session_test.rb ]; then paths+=(test/models/session_test.rb); fi
             if [ -f test/controllers/web_push_activity_test.rb ]; then paths+=(test/controllers/web_push_activity_test.rb); fi
