@@ -44,7 +44,7 @@ jobs:
     runs-on: ${{ inputs.runner_label }}
     timeout-minutes: 90
     container:
-      image: ruby:3.4.9-bookworm
+      image: ruby:3.4.13-bookworm
     env:
       RAILS_ENV: test
       DB_HOST: postgres
